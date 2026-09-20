@@ -1,0 +1,126 @@
+#!/bin/bash
+
+## Copyright (c) Mobidelio Professional Services.
+## Licensed under the Apache 2.0 License.
+
+## This Mobidelio Software is provided by Mobidelio on an "AS IS" basis. Mobidelio
+## MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE IMPLIED WARRANTIES OF
+## NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, REGARDING THE
+## Mobidelio SOFTWARE OR ITS USE AND OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+##
+## IN NO EVENT SHALL Mobidelio BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR CONSEQUENTIAL
+## DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+## OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE,
+## REPRODUCTION, MODIFICATION AND/OR DISTRIBUTION OF THE Mobidelio SOFTWARE, HOWEVER CAUSED AND
+## WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY OR
+## OTHERWISE, EVEN IF Mobidelio HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+##
+## Download and install Microsoft apps from a package.
+## Version: 1.2
+##
+
+# Get Microsoft LinkIDs at https://mofa.cocolabs.dev/standalone_apps/
+
+# Variables
+linkID="$4"
+appName="$5"
+tempFile="Installer.pkg"
+webURL="https://go.microsoft.com/fwlink/?linkid=$linkID"
+
+# Functions
+
+checkParameters() {
+
+    if [[ -z "$linkID" ]]; then
+        echo "$(date) | No Microsoft LinkID provided. Exiting with error."
+        exit 1
+    fi
+
+    if [[ -z "$appName" ]]; then
+        echo "$(date) | No application name provided. Exiting with error."
+        exit 1
+    fi
+}
+
+createTempDirectory() {
+
+    tempDir=$(mktemp -d -p /private/tmp/) || {
+        echo "$(date) | Failed to create temporary directory."
+        exit 1
+    }
+
+    echo "$(date) | Temporary directory created: $tempDir"
+}
+
+cleanup() {
+
+    if [[ -d "$tempDir" ]]; then
+        echo "$(date) | Cleaning Up"
+        rm -rf "$tempDir"
+    fi
+}
+
+appDownload() {
+
+    echo "$(date) | Starting download of $appName"
+    echo "$(date) | Downloading $appName from $webURL"
+
+    if curl -f -sS \
+        --connect-timeout 30 \
+        --retry 5 \
+        --retry-delay 60 \
+        --compressed \
+        -L \
+        -o "$tempDir/$tempFile" \
+        "$webURL"; then
+
+        echo "$(date) | Installer downloaded successfully"
+
+    else
+
+        echo "$(date) | Failed to download [$webURL]"
+        cleanup
+        exit 1
+
+    fi
+
+    if [[ ! -s "$tempDir/$tempFile" ]]; then
+        echo "$(date) | Downloaded installer is missing or empty."
+        cleanup
+        exit 1
+    fi
+}
+
+appInstall() {
+
+    echo "$(date) | Installing $appName"
+
+    if installer -pkg "$tempDir/$tempFile" -target /; then
+
+        echo "$(date) | $appName installed"
+        cleanup
+        exit 0
+
+    else
+
+        echo "$(date) | Failed to install $appName"
+        cleanup
+        exit 1
+
+    fi
+}
+
+# Script
+
+# Check parameters
+checkParameters
+
+# Create temporary directory
+createTempDirectory
+
+# Download installer package
+appDownload
+
+# Install application
+appInstall
